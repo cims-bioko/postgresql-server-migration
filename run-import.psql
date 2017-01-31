@@ -1,0 +1,10 @@
+
+create database openhds encoding=UTF8;
+
+\c openhds
+
+\ir schema-creation/create-tables.sql
+\ir output/pg_import.sql
+\ir schema-creation/create-indices.sql
+\ir schema-creation/create-views.sql
+

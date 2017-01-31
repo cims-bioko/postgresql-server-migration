@@ -1,0 +1,78 @@
+#!/bin/bash
+
+##
+# create-import - creates an sql import script for migrating the existing
+# openhds database (based on MySQL) to PostgreSQL. It relies on a python script
+# developed at lanyrd, but avoids company-specific bits by only using it to
+# convert the DML operations and not the DDL that defines the database schema. I
+# already did the work of converting the database schema manually when
+# developing the flyway migrations for the new openhds server.
+#
+# Created by Brent Atkinson - January 31, 2017
+#
+# Requires: bash, ssh, gzip, grep and python
+##
+
+set -o errexit
+
+HOSTNAME=cims-bioko.org
+DB=openhds
+DB_USER=openhds
+DAY=$(date +'%F')
+
+LOCAL_OUTPUT=output
+REMOTE_OUTPUT=create-import
+
+DUMP_LOG=$LOCAL_OUTPUT/dump.log
+
+DB_FILE=${DB}-${DAY}.sql
+DB_FILE_GZ=${DB_FILE}.gz
+REMOTE_DBFILE=${REMOTE_OUTPUT}/${DB_FILE}
+REMOTE_DBFILE_GZ=${REMOTE_OUTPUT}/${DB_FILE_GZ}
+LOCAL_DBFILE=${LOCAL_OUTPUT}/${DB_FILE}
+LOCAL_DBFILE_GZ=${LOCAL_OUTPUT}/${DB_FILE_GZ}
+
+SED_FILE=preprocess.sed
+
+RAW_INSERTS=${LOCAL_OUTPUT}/mysql_inserts.sql
+PRE_CONVERT=${LOCAL_OUTPUT}/pre_convert.sql
+PG_IMPORT=${LOCAL_OUTPUT}/pg_import.sql
+
+# create output directory so contents are easy to ignore/remove
+if [[ ! -d $LOCAL_OUTPUT ]]; then
+   echo "creating output directory: $LOCAL_OUTPUT"
+   mkdir $LOCAL_OUTPUT
+fi
+
+# prompt for the production openhds MySQL database password
+read -s -p "MySQL Password ($DB_USER): " DB_PASS
+
+echo
+echo "dumping compressed prod database: $REMOTE_DBFILE_GZ"
+ssh -T $HOSTNAME >& $DUMP_LOG <<EOS
+   if [[ ! -d $REMOTE_OUTPUT ]]; then
+      mkdir $REMOTE_OUTPUT
+   fi
+   rm -f $REMOTE_DBFILE $REMOTE_DBFILE_GZ
+   mysqldump -u $DB_USER --password=$DB_PASS --compatible=postgresql \
+      --default-character-set=utf8 $DB > ${REMOTE_DBFILE}
+   gzip $REMOTE_DBFILE
+EOS
+
+echo "fetching MySQL dump from production server"
+scp $HOSTNAME:~/${REMOTE_DBFILE_GZ} ${LOCAL_DBFILE_GZ}
+
+echo "extracting db dump so we can manipulate it"
+gunzip -f $LOCAL_DBFILE_GZ
+
+echo "extracting insert statements"
+grep --binary-files=text '^INSERT' $LOCAL_DBFILE > $RAW_INSERTS
+
+echo "pre-processing inserts prior to conversion"
+sed -r --file=${SED_FILE} $RAW_INSERTS >${PRE_CONVERT}
+
+#echo "converting inserts using mysql-postgresql-converter"
+./mysql-postgresql-converter/db_converter.py $PRE_CONVERT $PG_IMPORT
+
+echo "conversion complete, result: $PG_IMPORT"
+
