@@ -1,7 +1,7 @@
 
-create database openhds encoding=UTF8;
+create schema if not exists openhds;
 
-\c openhds
+SET search_path TO openhds;
 
 \ir schema-creation/create-tables.sql
 \ir output/pg_import.sql
