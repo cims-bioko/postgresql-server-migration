@@ -15,7 +15,7 @@
 
 set -o errexit
 
-HOSTNAME=cims-bioko.org
+HOSTNAME=db.cims-bioko.org
 DB=openhds
 DB_USER=openhds
 DAY=$(date +'%F')
