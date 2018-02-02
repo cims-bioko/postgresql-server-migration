@@ -1,5 +1,7 @@
 # CIMS Server PostgreSQL Migration
 
+*This project is no longer active. With the successful migration of cims-server to PostgreSQL, this project exists only for archival purposes.*
+
 This is an semi-automated migration tool for converting the openhds database
 used by the cims-server program from MySQL to PostgreSQL. The original migration
 was undertaken primarily in order to take advantage of the database's improved
