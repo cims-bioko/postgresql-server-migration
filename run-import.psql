@@ -1,4 +1,6 @@
 
+SET role rds_superuser;
+
 create schema if not exists openhds;
 
 SET search_path TO openhds;
